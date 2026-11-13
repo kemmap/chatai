@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { loadConfig } from './config.js';
 import { createBot } from './bot.js';
 
@@ -65,9 +66,20 @@ async function main() {
 
     console.log(`📡 Bot đang lắng nghe tin nhắn... (Nhấn Ctrl+C để dừng)`);
 
+    // Render Web Service requires an open HTTP port to pass health checks
+    const port = process.env.PORT || 8080;
+    const server = http.createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('🤖 Telegram AI Bot is running smoothly on Render!\n');
+    });
+    server.listen(port, () => {
+      console.log(`🌐 HTTP Health Check Server đang lắng nghe trên cổng: ${port}`);
+    });
+
     // Graceful stop handlers
     const stopBot = async (signal: string) => {
       console.log(`\n🛑 Nhận tín hiệu ${signal}. Đang tắt bot an toàn...`);
+      server.close();
       bot.stop();
       process.exit(0);
     };
