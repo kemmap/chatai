@@ -67,18 +67,35 @@ async function main() {
     console.log(`📡 Bot đang lắng nghe tin nhắn... (Nhấn Ctrl+C để dừng)`);
 
     // Render Web Service requires an open HTTP port to pass health checks
-    const port = process.env.PORT || 8080;
+    const port = Number(process.env.PORT) || 8080;
     const server = http.createServer((req, res) => {
       res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('🤖 Telegram AI Bot is running smoothly on Render!\n');
     });
-    server.listen(port, () => {
-      console.log(`🌐 HTTP Health Check Server đang lắng nghe trên cổng: ${port}`);
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`🌐 HTTP Health Check Server đang lắng nghe trên: 0.0.0.0:${port}`);
     });
+
+    // Auto Keep-Alive: Ping itself periodically so Render Free Tier won't sleep after 15m
+    const externalUrl = process.env.RENDER_EXTERNAL_URL;
+    let keepAliveTimer: NodeJS.Timeout | undefined;
+    if (externalUrl) {
+      console.log(`⏱️ Đã kích hoạt cơ chế Keep-Alive tự động cho Render: ${externalUrl}`);
+      keepAliveTimer = setInterval(async () => {
+        try {
+          const pingRes = await fetch(externalUrl);
+          console.log(`💓 Keep-alive ping [${pingRes.status}] tới ${externalUrl}`);
+        } catch (err: any) {
+          console.warn(`⚠️ Keep-alive ping thất bại:`, err?.message || err);
+        }
+      }, 9 * 60 * 1000); // 9 minutes
+      keepAliveTimer.unref?.();
+    }
 
     // Graceful stop handlers
     const stopBot = async (signal: string) => {
       console.log(`\n🛑 Nhận tín hiệu ${signal}. Đang tắt bot an toàn...`);
+      if (keepAliveTimer) clearInterval(keepAliveTimer);
       server.close();
       bot.stop();
       process.exit(0);
